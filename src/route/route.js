@@ -1,1 +1,14 @@
-console.log(object);
+const express = require ('express')
+const router = express.Router()
+const urlController = require("../controller/urlControllers")
+
+
+router.post("/url/shorten", urlController.urlShortener)
+
+
+router.all("/*", (req,res)=> {
+    return res.status(400).send({ status: false, Message: "Invalid URL"})
+
+});
+
+module.exports = router
