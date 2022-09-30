@@ -68,22 +68,25 @@ const urlShortener = async function (req, res) {
 
 
 
-const getUrlcode = async function (res,req){
+const getUrlcode = async function (req,res){
 try {
-    let data = req.param.urlCode
-    if(!validator.isValidRequestBody(data))
-    return res.status(400).send({status : false , msg : "please give value in the param"})
-     if(!shortId.isValid(data)){
-      return res.status(400).send({status : false , msg : "Invalid Urlcode "})
+  let data = req.params.urlCode
+    if(!shortid.isValid(data)){
+    return res.status(400).send({status : false , msg : "please give value in the param"})}
+    //  if(!shortid.isValid(data)){
+    //   return res.status(400).send({status : false , msg : "Invalid Urlcode "})}
+      let Urlcodefound = await urlModel.findOne({urlCode:data})
+      if(!Urlcodefound){
+        return res.status(404).send({status : false , msg : "UrlCode is not found"})
+      }
+      return res.status(302).redirect(Urlcodefound.longUrl)
 
-     
-     
-
-  }
-} catch (err) {
-  return res.status(500).send({ status: false, message: err.message });
-}  
+} catch (error) {
+  res.status(500).send({status : false , msg : error.message})
 }
+}
+
+
 // ### GET /:urlCode
 // - Redirect to the original URL corresponding
 // - Use a valid HTTP status code meant for a redirection scenario.
