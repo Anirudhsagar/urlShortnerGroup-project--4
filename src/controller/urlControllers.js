@@ -10,11 +10,12 @@ const { stat } = require("fs");
 
 //Connect to redis
 const redisClient = redis.createClient(
-  18447,    //port number
+  18447, //port number
   "redis-18447.c212.ap-south-1-1.ec2.cloud.redislabs.com", //end point
   { no_ready_check: true }
 );
-redisClient.auth("s38aevI8u89pQakUvsUPMdV2Spaw4GoV", function (err) {     //password
+redisClient.auth("s38aevI8u89pQakUvsUPMdV2Spaw4GoV", function (err) {
+  //password
   if (err) throw err;
 });
 
@@ -22,10 +23,8 @@ redisClient.on("connect", async function () {
   console.log("Connected to Redis..");
 });
 
-
 const SET_ASYNC = promisify(redisClient.SET).bind(redisClient);
 const GET_ASYNC = promisify(redisClient.GET).bind(redisClient);
-
 
 function checkUrl(url) {
   const reg =
@@ -58,38 +57,36 @@ const urlShortener = async function (req, res) {
       });
 
     let urlCode = shortid.generate(longUrl).toLowerCase();
-    if ((longUrl)) {
-      let cachedUrl = await GET_ASYNC(`${longUrl}`)
-      cachedUrl = JSON.parse(cachedUrl)
-      if(cachedUrl)    
-      return res.status(200).send({ status: true, data: cachedUrl})
+    if (longUrl) {
+      let cachedUrl = await GET_ASYNC(`${longUrl}`);
+      cachedUrl = JSON.parse(cachedUrl);
+      if (cachedUrl)
+        return res.status(200).send({ status: true, data: cachedUrl });
 
-      let url = await urlModel.findOne({longUrl}).select({ _id: 0, __v: 0 })
+      let url = await urlModel.findOne({ longUrl }).select({ _id: 0, __v: 0 });
 
       if (url) {
-          await SET_ASYNC(`${longUrl}`, JSON.stringify(url))
-          res.status(200).send({ status: true, data: url })
+        await SET_ASYNC(`${longUrl}`, JSON.stringify(url));
+        res.status(200).send({ status: true, data: url });
       } else {
+        const shortUrl = "http://localhost:3000/" + urlCode;
 
-          const shortUrl = "http://localhost:3000/" + urlCode
+        let url = await urlModel.create({ longUrl, shortUrl, urlCode });
+        let data = {
+          longUrl: url.longUrl,
+          shortUrl: url.shortUrl,
+          urlCode: url.urlCode,
+        };
 
-          let url = await urlModel.create({longUrl, shortUrl, urlCode})
-          let data = {
-              longUrl : url.longUrl,
-              shortUrl : url.shortUrl,
-              urlCode : url.urlCode
-          }
-
-          res.status(201).send({ status: true, data: data })
+        res.status(201).send({ status: true, data: data });
       }
+    } else {
+      res.status(400).send({ status: false, message: "Invalid longUrl" });
+    }
+  } catch (error) {
+    res.status(500).send({ status: false, message: error.message });
   }
-  else {
-      res.status(400).send({ status: false, message: "Invalid longUrl" })
-  }
-}
-catch (error) {
-  res.status(500).send({ status: false, message: error.message })
-}}
+};
 // ======================get API=====================
 
 const getUrlcode = async function (req, res) {
@@ -109,7 +106,7 @@ const getUrlcode = async function (req, res) {
     }
     let cachedata = await GET_ASYNC(`${data}`);
     if (cachedata) {
-      return res.status(302).redirect(data);
+      return res.status(302).redirect(Urlcodefound.longUrl);
     } else {
       let profile = await urlModel.findOne({ data });
       await SET_ASYNC(`${data}`, JSON.stringify(profile));
