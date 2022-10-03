@@ -24,7 +24,6 @@
     "node-url-shortener": "^2.0.3",
     "nodemon": "^2.0.20",
     "shortid": "^2.2.16",
-    "valid-url": "^1.0.9",
-    "validator": "^13.7.0"
+    "valid-url": "^1.0.9"
   }
 }
