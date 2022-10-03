@@ -5,6 +5,36 @@ const url = require("validator");
 const validator = require("../validation/validation");
 
 
+const redis = require("redis");
+
+const { promisify } = require("util");
+const { stat } = require("fs");
+
+//Connect to redis
+const redisClient = redis.createClient(
+  18447,
+  "redis-18447.c212.ap-south-1-1.ec2.cloud.redislabs.com",
+  { no_ready_check: true }
+);
+redisClient.auth("s38aevI8u89pQakUvsUPMdV2Spaw4GoV", function (err) {
+  if (err) throw err;
+});
+
+redisClient.on("connect", async function () {
+  console.log("Connected to Redis..");
+});
+
+
+
+//1. connect to the server
+//2. use the commands :
+
+//Connection setup for redis
+
+const SET_ASYNC = promisify(redisClient.SET).bind(redisClient);
+const GET_ASYNC = promisify(redisClient.GET).bind(redisClient);
+
+
 const urlShortener = async function (req, res) {
   try {
     let data1 = req.body;
@@ -14,10 +44,7 @@ const urlShortener = async function (req, res) {
       return res
         .status(400)
         .send({ status: false, message: "Provide the longUrl in the body." });
-    if (!validator.isValid(longUrl))
-      return res
-        .status(400)
-        .send({ status: false, message: "Provide the longUrl in the body." });
+    
 
     let found = false;
 
@@ -43,7 +70,7 @@ const urlShortener = async function (req, res) {
         data: urlPresent,
       });
 
-    let urlCode = shortid.generate(longUrl);
+    let urlCode = shortid.generate(longUrl).toLowerCase()
     let shortUrl = "http://localhost:3000/" + urlCode;
     obj = {
       longUrl: longUrl,
@@ -78,6 +105,13 @@ try {
       let Urlcodefound = await urlModel.findOne({urlCode:data})
       if(!Urlcodefound){
         return res.status(404).send({status : false , msg : "UrlCode is not found"})
+      }
+      let cachedata = await GET_ASYNC(`${data}`)
+      if(cachedata){
+        res.status(302).redirect(data)
+      }else{
+        let profile = await urlModel.findOne({data})
+        await SET_ASYNC (`${data}`, JSON.stringify(profile))
       }
       return res.status(302).redirect(Urlcodefound.longUrl)
 
