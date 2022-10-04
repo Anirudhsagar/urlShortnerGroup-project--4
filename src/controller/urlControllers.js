@@ -106,12 +106,15 @@ const getUrlcode = async function (req, res) {
     }
     let cachedata = await GET_ASYNC(`${data}`);
     if (cachedata) {
+      // console.log("from cache");
       return res.status(302).redirect(Urlcodefound.longUrl);
     } else {
       let profile = await urlModel.findOne({ data });
+      console.log("from MongoDb");
       await SET_ASYNC(`${data}`, JSON.stringify(profile));
     }
     return res.status(302).redirect(Urlcodefound.longUrl);
+    
   } catch (error) {
     res.status(500).send({ status: false, msg: error.message });
   }
