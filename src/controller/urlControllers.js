@@ -1,6 +1,7 @@
 const urlModel = require("../models/urlModel");
 const shortid = require("shortid");
-// const axios = require("axios");
+const axios = require("axios");
+const urlId = require("shortid");
 const validator = require("../validation/validation");
 
 const redis = require("redis");
@@ -31,60 +32,57 @@ function checkUrl(url) {
     /^\s*http[s]?:\/\/([a-z]{2,3}\.)?[a-zA-Z0-9]+\.[a-z]{2,3}(\.[a-z]{2})?(\/[\w\-!:@#$%^&*()+=?\.]*)*\s*$/;
   return reg.test(url);
 }
-const urlShortener = async function (req, res) {
+const urlShorter = async function (req, res) {
   try {
-    let longUrl = req.body.longUrl;
+    let origUrl = req.body.longUrl;
 
-    if (!validator.isValid(longUrl))
+    if (!origUrl) {
       return res
         .status(400)
-        .send({ status: false, message: "Provide the longUrl in the body." });
+        .send({ status: false, message: "please fill the body" });
+    }
 
-    if (!checkUrl(req.body.longUrl)) {
+    if (!checkUrl(origUrl)) {
       return res
         .status(400)
         .send({ status: false, message: "Enter a valid URL." });
     }
 
-    let urlPresent = await urlModel
-      .findOne({ longUrl: longUrl })
-      .select({ createdAt: 0, updatedAt: 0, __v: 0, _id: 0 });
-    if (urlPresent)
-      return res.status(200).send({
-        status: true,
-        message: "urlCode is already generated for this URL.",
-        data: urlPresent,
-      });
+    let option = {
+      method: "get",
+      url: origUrl,
+    };
+    let exist = await axios(option)
+      .then(() => origUrl) // Pending and Fulfilled Promise Handling
+      .catch(() => null); // Reject Promise Handling
 
-    let urlCode = shortid.generate(longUrl).toLowerCase();
-    if (longUrl) {
-      let cachedUrl = await GET_ASYNC(`${longUrl}`);
-      cachedUrl = JSON.parse(cachedUrl);
-      if (cachedUrl)
-        return res.status(200).send({ status: true, data: cachedUrl });
-
-      let url = await urlModel.findOne({ longUrl }).select({ _id: 0, __v: 0 });
-
-      if (url) {
-        await SET_ASYNC(`${longUrl}`, JSON.stringify(url));
-        res.status(200).send({ status: true, data: url });
-      } else {
-        const shortUrl = "http://localhost:3000/" + urlCode;
-
-        let url = await urlModel.create({ longUrl, shortUrl, urlCode });
-        let data = {
-          longUrl: url.longUrl,
-          shortUrl: url.shortUrl,
-          urlCode: url.urlCode,
-        };
-
-        res.status(201).send({ status: true, data: data });
-      }
-    } else {
-      res.status(400).send({ status: false, message: "Invalid longUrl" });
+    let isPresent = await urlModel
+      .findOne({ longUrl: origUrl })
+      .select({ _id: 0, longUrl: 1, shortUrl: 1, urlCode: 1 });
+    if (isPresent) {
+      return res
+        .status(200)
+        .send({
+          status: true,
+          message: "short URL is already generated with requested URL",
+          data: isPresent,
+        });
     }
-  } catch (error) {
-    res.status(500).send({ status: false, message: error.message });
+
+    let baseUrl = "http://localhost:3000/";
+    let urlCode = urlId.generate().toLowerCase();
+    let reqUrl = baseUrl + urlCode;
+
+    obj = {
+      longUrl: origUrl,
+      shortUrl: reqUrl,
+      urlCode: urlCode,
+    };
+
+    let urlDetails = await urlModel.create(obj);
+    return res.status(201).send({ status: true, data: obj });
+  } catch (err) {
+    return res.status(500).send({ satus: false, messege: err.message });
   }
 };
 // ======================get API=====================
@@ -114,10 +112,9 @@ const getUrlcode = async function (req, res) {
       await SET_ASYNC(`${data}`, JSON.stringify(profile));
     }
     return res.status(302).redirect(Urlcodefound.longUrl);
-    
   } catch (error) {
     res.status(500).send({ status: false, msg: error.message });
   }
 };
 
-module.exports = { urlShortener, getUrlcode };
+module.exports = { urlShorter, getUrlcode };
