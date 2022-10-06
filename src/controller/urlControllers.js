@@ -133,7 +133,7 @@ const getUrlcode = async function (req, res) {
     }
 
     let cacheData = await GET_ASYNC(`${req.params.urlCode}`);
-    console.log(cacheData);
+
     if (cacheData) {
       return res.status(200).send(cacheData);
     } else {
@@ -143,9 +143,10 @@ const getUrlcode = async function (req, res) {
           .status(404)
           .send({ status: false, message: "wrong url code" });
         if(profile)
-      await SET_ASYNC(`${req.params.urlCode}`,JSON.stringify(profile));            //to send the document for redis database 
+      await SET_ASYNC(`${profile.longUrl}`,JSON.stringify(profile.longUrl));            //to send the document for redis database 
       return res.status(302).redirect(profile.longUrl);
     }
+  
   } catch (error) {
     res.status(500).send({ status: false, msg: error.message });
   }
