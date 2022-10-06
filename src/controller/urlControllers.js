@@ -21,7 +21,6 @@ redisClient.on("connect", async function () {
   console.log("Connected to Redis..");
 });
 
-
 // =============================binding================================
 
 const SET_ASYNC = promisify(redisClient.SET).bind(redisClient);
@@ -34,7 +33,7 @@ const urlShorter = async function (req, res) {
   try {
     let { longUrl } = req.body;
     let obj = {};
-    
+
     //------------------------------------ validating inout from req.body
     if (Object.keys(req.body).length == 0) {
       return res
@@ -46,21 +45,21 @@ const urlShorter = async function (req, res) {
       return res
         .status(400)
         .send({ status: false, message: "longUrl is missing" });
-      }
+    }
 
-//------------------------- checking in cache memory
+    //------------------------- checking in cache memory
 
     let cachedLongUrl = await GET_ASYNC(longUrl);
-    
-//---------------------------- cache hit case
+
+    //---------------------------- cache hit case
 
     if (cachedLongUrl)
       return res.status(201).send({
         status: true,
-        message: "Url is already shortened",
+        message: "Url is already shortened and present in cache",
         data: JSON.parse(cachedLongUrl),
       });
-//---------------------------- cache miss case
+    //---------------------------- cache miss case
     else {
       let found = false;
       await axios
@@ -68,33 +67,47 @@ const urlShorter = async function (req, res) {
         .then((response) => {
           if (response.status == 200 || response.status == 201) found = true;
         })
-        .catch((err) => {err});
-        
-        if (!found)
+        .catch((err) => {
+          err;
+        });
+
+      if (!found)
         return res
           .status(400)
           .send({ status: "false", message: "Invalid URL" });
 
-// ---------------------------------checking for duplicate longURL
+      // ---------------------------------checking for duplicate longURL
       let checkURL = await urlModel
-        .findOne({ longUrl: longUrl })
-        .select({longUrl:longUrl, longUrl:1, shortUrl:1, urlCode:1, _id:0 });
+        .findOne({ longUrl })
+        .select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 });
+      if (checkURL) {
+        await SET_ASYNC(`${longUrl}`, JSON.stringify(checkURL));
+        return res
+          .status(409)
+          .send({
+            status: true,
+            msg: "Url already present",
+            data: checkURL,
+          });
+      }
 
-//------------------------------- if longURL is not present in collection, creating new data
-        if (!checkURL) {
-          obj.longUrl = longUrl;
-          obj.urlCode = shortid.generate();
-          
-          obj.shortUrl = "http://localhost:3000/".concat(
-            obj.urlCode.toLocaleLowerCase()
-            );
-            
-//------------------------------- creating new data
-            await urlModel.create(obj);
-            checkURL = await urlModel.findOne(obj).select({longUrl:longUrl, longUrl:1, shortUrl:1, urlCode:1, _id:0});
-          }
+      //------------------------------- if longURL is not present in collection, creating new data
+      if (!checkURL) {
+        obj.longUrl = longUrl;
+        obj.urlCode = shortid.generate();
 
-//------------------------------------- set expiry for redis
+        obj.shortUrl = "http://localhost:3000/".concat(
+          obj.urlCode.toLocaleLowerCase()
+        );
+
+        //------------------------------- creating new data
+        await urlModel.create(obj);
+        checkURL = await urlModel
+          .findOne(obj)
+          .select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 });
+      }
+
+      //------------------------------------- set expiry for redis
       await SETEX_ASYNC(`${longUrl}`, 10, JSON.stringify(checkURL));
       await SETEX_ASYNC(`${checkURL.urlCode}`, 20, JSON.stringify(checkURL));
 
@@ -119,18 +132,19 @@ const getUrlcode = async function (req, res) {
         .send({ status: false, msg: "please give value in the param" });
     }
 
-    let cachedata = await GET_ASYNC(`${data}`);
-    console.log(cachedata);
-    if (cachedata) {
-      return res.status(302).redirect(cachedata);
-
+    let cacheData = await GET_ASYNC(`${data}`);
+    console.log(cacheData);
+    if (cacheData) {
+      return res.status(200).send(cacheData);
     } else {
-      
-      let profile = await urlModel.findOne({data});
-      await SET_ASYNC(`${data}`, (profile.longUrl));
+      let profile = await urlModel.findOne({ data});
+      if (!profile)
+        return res
+          .status(400)
+          .send({ status: false, message: "wrong url code" });
+      await SET_ASYNC(`${data}`, profile.longUrl);
       return res.status(302).redirect(profile.longUrl);
     }
-
   } catch (error) {
     res.status(500).send({ status: false, msg: error.message });
   }
