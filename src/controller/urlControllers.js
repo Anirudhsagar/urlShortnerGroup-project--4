@@ -111,17 +111,7 @@ const urlShorter = async function (req, res) {
 };
 
 
-
-
-
 // ======================get API=====================
-
-
-
-
-
-
-
 
 const getUrlcode = async function (req, res) {
   try {
