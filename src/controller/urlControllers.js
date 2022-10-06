@@ -49,7 +49,7 @@ const urlShorter = async function (req, res) {
 
     //------------------------- checking in cache memory
 
-    let cachedLongUrl = await GET_ASYNC(longUrl);
+    let cachedLongUrl = await GET_ASYNC(`${longUrl}`);
 
     //---------------------------- cache hit case
 
@@ -79,7 +79,7 @@ const urlShorter = async function (req, res) {
       // ---------------------------------checking for duplicate longURL
       let checkURL = await urlModel
         .findOne({ longUrl })
-        .select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 });
+        .select({ _id: 0, __v:0 });
       if (checkURL) {
         await SET_ASYNC(`${longUrl}`, JSON.stringify(checkURL));
         return res
@@ -109,7 +109,7 @@ const urlShorter = async function (req, res) {
 
       //------------------------------------- set expiry for redis
       await SETEX_ASYNC(`${longUrl}`, 10, JSON.stringify(checkURL));
-      await SETEX_ASYNC(`${checkURL.urlCode}`, 20, JSON.stringify(checkURL));
+
 
       return res
         .status(201)
@@ -128,22 +128,22 @@ const getUrlcode = async function (req, res) {
     let data = req.params.urlCode;
     if (!shortid.isValid(data)) {
       return res
-        .status(400)
+        .status(404)
         .send({ status: false, msg: "please give value in the param" });
     }
 
-    let cacheData = await GET_ASYNC(`${data}`);
+    let cacheData = await GET_ASYNC(`${req.params.urlCode}`);
     console.log(cacheData);
     if (cacheData) {
-      return res.status(302).redirect(cacheData);
+      return res.status(200).send(cacheData);
     } else {
-      let profile = await urlModel.findOne({ data}).select({longUrl:1, shortUrl:0, urlCode:0, _id:0});
+      let profile = await urlModel.findOne({urlCode:data})
       if (!profile)
         return res
-          .status(400)
+          .status(404)
           .send({ status: false, message: "wrong url code" });
         if(profile)
-      await SET_ASYNC(`${data}`,JSON.stringify(profile));            //to send the document for redis database 
+      await SET_ASYNC(`${req.params.urlCode}`,JSON.stringify(profile));            //to send the document for redis database 
       return res.status(302).redirect(profile.longUrl);
     }
   } catch (error) {
