@@ -7,12 +7,12 @@ const { promisify } = require("util");
 // =====================================redis Configuration===================
 
 const redisClient = redis.createClient(
-  12500, //port number
-  "redis-12500.c301.ap-south-1-1.ec2.cloud.redislabs.com", //end point
+  18447, //port number
+  "redis-18447.c212.ap-south-1-1.ec2.cloud.redislabs.com", //end point
   { no_ready_check: true }
 );
 
-redisClient.auth("s7qMp9cEotNQchcRNXGhrTYvsXHmN52M", function (err) {
+redisClient.auth("s38aevI8u89pQakUvsUPMdV2Spaw4GoV", function (err) {
   //password
   if (err) throw err;
 });
@@ -68,7 +68,7 @@ const urlShorter = async function (req, res) {
         .then((response) => {
           if (response.status == 200 || response.status == 201) found = true;
         })
-        .catch((err) => {});
+        .catch((err) => {err});
         
         if (!found)
         return res
@@ -78,7 +78,7 @@ const urlShorter = async function (req, res) {
 // ---------------------------------checking for duplicate longURL
       let checkURL = await urlModel
         .findOne({ longUrl: longUrl })
-        .select({ _id: 0, __v: 0 });
+        .select({longUrl:longUrl, longUrl:1, shortUrl:1, urlCode:1, _id:0 });
 
 //------------------------------- if longURL is not present in collection, creating new data
         if (!checkURL) {
@@ -91,7 +91,7 @@ const urlShorter = async function (req, res) {
             
 //------------------------------- creating new data
             await urlModel.create(obj);
-            checkURL = await urlModel.findOne(obj).select({ _id: 0, __v: 0 });
+            checkURL = await urlModel.findOne(obj).select({longUrl:longUrl, longUrl:1, shortUrl:1, urlCode:1, _id:0});
           }
 
 //------------------------------------- set expiry for redis
@@ -119,24 +119,18 @@ const getUrlcode = async function (req, res) {
         .send({ status: false, msg: "please give value in the param" });
     }
 
-    let cachedata = await GET_ASYNC(`${req.params.urlCode}`);
+    let cachedata = await GET_ASYNC(`${data}`);
     console.log(cachedata);
     if (cachedata) {
       return res.status(302).redirect(cachedata);
+
     } else {
-      let profile = await urlModel.findOne({data});
       
+      let profile = await urlModel.findOne({data});
       await SET_ASYNC(`${data}`, (profile.longUrl));
-    }
-    
-    let Urlcodefound = await urlModel.findOne({ urlCode: data });
-    if (!Urlcodefound) {
-      return res
-        .status(404)
-        .send({ status: false, msg: "UrlCode is not found" });
+      return res.status(302).redirect(profile.longUrl);
     }
 
-    return res.status(302).redirect(Urlcodefound.longUrl);
   } catch (error) {
     res.status(500).send({ status: false, msg: error.message });
   }
