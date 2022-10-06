@@ -135,7 +135,7 @@ const getUrlcode = async function (req, res) {
    
     let cachedata = await GET_ASYNC(`${data}`);
     if (cachedata) {
-      // console.log("from cache");
+     //(console.log)
       return res.status(302).redirect(Urlcodefound.longUrl);
     } else {
       let profile = await urlModel.findOne({ data });
