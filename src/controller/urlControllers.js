@@ -1,21 +1,18 @@
-
 const urlModel = require("../models/urlModel");
 const shortid = require("shortid");
 const axios = require("axios");
-
-
 const redis = require("redis");
-
 const { promisify } = require("util");
 
+// =====================================redis Configuration===================
 
-//Connect to redis
 const redisClient = redis.createClient(
-  18447, //port number
-  "redis-18447.c212.ap-south-1-1.ec2.cloud.redislabs.com", //end point
+  12500, //port number
+  "redis-12500.c301.ap-south-1-1.ec2.cloud.redislabs.com", //end point
   { no_ready_check: true }
 );
-redisClient.auth("s38aevI8u89pQakUvsUPMdV2Spaw4GoV", function (err) {
+
+redisClient.auth("s7qMp9cEotNQchcRNXGhrTYvsXHmN52M", function (err) {
   //password
   if (err) throw err;
 });
@@ -24,16 +21,21 @@ redisClient.on("connect", async function () {
   console.log("Connected to Redis..");
 });
 
+
+// =============================binding================================
+
 const SET_ASYNC = promisify(redisClient.SET).bind(redisClient);
 const GET_ASYNC = promisify(redisClient.GET).bind(redisClient);
 const SETEX_ASYNC = promisify(redisClient.SETEX).bind(redisClient);
 
+// ================================================creating shorturl=========================
+
 const urlShorter = async function (req, res) {
   try {
-    let { longUrl} = req.body;
+    let { longUrl } = req.body;
     let obj = {};
-
-    // validating inout from req.body
+    
+    //------------------------------------ validating inout from req.body
     if (Object.keys(req.body).length == 0) {
       return res
         .status(400)
@@ -44,12 +46,13 @@ const urlShorter = async function (req, res) {
       return res
         .status(400)
         .send({ status: false, message: "longUrl is missing" });
-    }
+      }
 
-    // checking in cache memory
+//------------------------- checking in cache memory
+
     let cachedLongUrl = await GET_ASYNC(longUrl);
-
-    // cache hit case
+    
+//---------------------------- cache hit case
 
     if (cachedLongUrl)
       return res.status(201).send({
@@ -57,9 +60,8 @@ const urlShorter = async function (req, res) {
         message: "Url is already shortened",
         data: JSON.parse(cachedLongUrl),
       });
-    // cache miss case
+//---------------------------- cache miss case
     else {
-      // validating the URL
       let found = false;
       await axios
         .get(longUrl)
@@ -67,38 +69,34 @@ const urlShorter = async function (req, res) {
           if (response.status == 200 || response.status == 201) found = true;
         })
         .catch((err) => {});
-
-      if (!found)
+        
+        if (!found)
         return res
           .status(400)
           .send({ status: "false", message: "Invalid URL" });
 
-      // checking for duplicate longURL
+// ---------------------------------checking for duplicate longURL
       let checkURL = await urlModel
         .findOne({ longUrl: longUrl })
         .select({ _id: 0, __v: 0 });
 
-      // if longURL is not present in collection, creating new data
-      if (!checkURL) {
-        obj.longUrl = longUrl;
-        obj.urlCode = shortid.generate();
+//------------------------------- if longURL is not present in collection, creating new data
+        if (!checkURL) {
+          obj.longUrl = longUrl;
+          obj.urlCode = shortid.generate();
+          
+          obj.shortUrl = "http://localhost:3000/".concat(
+            obj.urlCode.toLocaleLowerCase()
+            );
+            
+//------------------------------- creating new data
+            await urlModel.create(obj);
+            checkURL = await urlModel.findOne(obj).select({ _id: 0, __v: 0 });
+          }
 
-        obj.shortUrl = "http://localhost:3000/".concat(
-          obj.urlCode.toLocaleLowerCase()
-        );
-
-        // creating new data
-        await urlModel.create(obj);
-        checkURL = await urlModel.findOne(obj).select({ _id: 0, __v: 0 });
-      }
-
-      // set values in cache memory
-      await SETEX_ASYNC(`${longUrl}`,10, JSON.stringify(checkURL));
-      await SETEX_ASYNC(
-        `${checkURL.urlCode}`,
-        10,
-        JSON.stringify(checkURL)
-      );
+//------------------------------------- set expiry for redis
+      await SETEX_ASYNC(`${longUrl}`, 10, JSON.stringify(checkURL));
+      await SETEX_ASYNC(`${checkURL.urlCode}`, 20, JSON.stringify(checkURL));
 
       return res
         .status(201)
@@ -109,7 +107,6 @@ const urlShorter = async function (req, res) {
     return res.status(500).send({ status: false, messgae: err.messgae });
   }
 };
-
 
 // ======================get API=====================
 
@@ -122,18 +119,16 @@ const getUrlcode = async function (req, res) {
         .send({ status: false, msg: "please give value in the param" });
     }
 
-   
-    let cachedata = await GET_ASYNC(`${data}`);
+    let cachedata = await GET_ASYNC(`${req.params.urlCode}`);
+    console.log(cachedata);
     if (cachedata) {
-     //(console.log)
-      return res.status(302).redirect(Urlcodefound.longUrl);
+      return res.status(302).redirect(cachedata);
     } else {
-      let profile = await urlModel.findOne({ data });
-      console.log("from MongoDb");
-      await SET_ASYNC(`${data}`, JSON.stringify(profile));
+      let profile = await urlModel.findOne({data});
+      
+      await SET_ASYNC(`${data}`, (profile.longUrl));
     }
-
-
+    
     let Urlcodefound = await urlModel.findOne({ urlCode: data });
     if (!Urlcodefound) {
       return res
@@ -146,6 +141,5 @@ const getUrlcode = async function (req, res) {
     res.status(500).send({ status: false, msg: error.message });
   }
 };
-
 
 module.exports = { urlShorter, getUrlcode };
