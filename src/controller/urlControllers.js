@@ -143,7 +143,7 @@ const getUrlcode = async function (req, res) {
           .status(404)
           .send({ status: false, message: "wrong url code" });
         if(profile)
-      await SET_ASYNC(`${profile.longUrl}`,JSON.stringify(profile.longUrl));            //to send the document for redis database 
+      await SET_ASYNC(`${profile}`,JSON.stringify(profile.longUrl));            //to send the document for redis database 
       return res.status(302).redirect(profile.longUrl);
     }
   
