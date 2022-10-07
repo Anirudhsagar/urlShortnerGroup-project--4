@@ -129,13 +129,13 @@ const getUrlcode = async function (req, res) {
     if (!shortid.isValid(data)) {
       return res
         .status(404)
-        .send({ status: false, msg: "please give value in the param" });
+        .send({ status: false, msg: "please give valid url code" });
     }
 
     let cacheData = await GET_ASYNC(`${req.params.urlCode}`);
 
     if (cacheData) {
-      return res.status(200).send(cacheData);
+      return res.status(302).redirect(cacheData);
     } else {
       let profile = await urlModel.findOne({urlCode:data})
       if (!profile)
@@ -144,7 +144,7 @@ const getUrlcode = async function (req, res) {
           .send({ status: false, message: "wrong url code" });
         if(profile)
       await SET_ASYNC(`${profile}`,JSON.stringify(profile.longUrl));            //to send the document for redis database 
-      return res.status(302).redirect(profile.longUrl);
+      return res.status(200).send(profile.longUrl);
     }
   
   } catch (error) {
