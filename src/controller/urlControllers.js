@@ -83,7 +83,7 @@ const urlShorter = async function (req, res) {
       if (checkURL) {
         await SET_ASYNC(`${longUrl}`, JSON.stringify(checkURL));
         return res
-          .status(409)
+          .status(200)
           .send({
             status: true,
             msg: "Url already present in MongoDb",
@@ -117,7 +117,7 @@ const urlShorter = async function (req, res) {
     }
   } catch (err) {
     console.log(err);
-    return res.status(500).send({ status: false, messgae: err.messgae });
+    return res.status(500).send({ status: false, message: err.message });
   }
 };
 
